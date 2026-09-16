@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:physioghar_therapist/providers/therapists_provider.dart';
 
-import '../../providers/therapist_provider.dart';
+//import '../../providers/therapist_provider.dart';
 import '../complaints/complaints_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -18,135 +19,175 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final therapist = ref.watch(therapistProvider);
+    final therapistAsync = ref.watch(therapistProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(isNepali ? 'खाता' : 'Account')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          CircleAvatar(
-            radius: 42,
-            child: Text(
-              therapist.name[0],
-              style: const TextStyle(fontSize: 30),
+      body: therapistAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  isNepali
+                      ? 'प्रोफाइल लोड गर्न सकिएन'
+                      : 'Unable to load profile',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.invalidate(therapistProvider);
+                  },
+                  child: Text(isNepali ? 'पुन: प्रयास' : 'Retry'),
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          Center(
-            child: Text(
-              therapist.name,
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _infoRow(
-                    icon: Icons.email_outlined,
-                    label: isNepali ? 'इमेल' : 'Email',
-                    value: therapist.email,
-                  ),
-                  _infoRow(
-                    icon: Icons.phone_outlined,
-                    label: isNepali ? 'फोन' : 'Phone',
-                    value: therapist.phone,
-                  ),
-                  _infoRow(
-                    icon: Icons.medical_services_outlined,
-                    label: isNepali ? 'विशेषज्ञता' : 'Specialization',
-                    value: therapist.specialization,
-                  ),
-                  _infoRow(
-                    icon: Icons.work_outline,
-                    label: isNepali ? 'अनुभव' : 'Experience',
-                    value: therapist.experience,
-                  ),
-                  _infoRow(
-                    icon: Icons.location_on_outlined,
-                    label: isNepali ? 'ठेगाना' : 'Address',
-                    value: therapist.address,
-                  ),
-                ],
+        ),
+        data: (therapist) {
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              CircleAvatar(
+                radius: 42,
+                child: Text(
+                  therapist.name.isNotEmpty
+                      ? therapist.name[0].toUpperCase()
+                      : 'T',
+                  style: const TextStyle(fontSize: 30),
+                ),
               ),
-            ),
-          ),
 
-          const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return const EditProfileScreen();
+              Center(
+                child: Text(
+                  therapist.name,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _infoRow(
+                        icon: Icons.email_outlined,
+                        label: isNepali ? 'इमेल' : 'Email',
+                        value: therapist.email,
+                      ),
+
+                      _infoRow(
+                        icon: Icons.phone_outlined,
+                        label: isNepali ? 'फोन' : 'Phone',
+                        value: therapist.phone,
+                      ),
+
+                      _infoRow(
+                        icon: Icons.medical_services_outlined,
+                        label: isNepali ? 'विशेषज्ञता' : 'Specialization',
+                        value: therapist.specialization,
+                      ),
+
+                      _infoRow(
+                        icon: Icons.work_outline,
+                        label: isNepali ? 'अनुभव' : 'Experience',
+                        value: '${therapist.experience} years',
+                      ),
+
+                      _infoRow(
+                        icon: Icons.info_outline,
+                        label: isNepali ? 'बायो' : 'Bio',
+                        value: therapist.bio.isEmpty
+                            ? isNepali
+                                  ? 'बायो उपलब्ध छैन'
+                                  : 'No bio available'
+                            : therapist.bio,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return const EditProfileScreen();
+                        },
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: Text(
+                    isNepali ? 'प्रोफाइल सम्पादन गर्नुहोस्' : 'Edit Profile',
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(isNepali ? 'भाषा' : 'Language'),
+                  subtitle: Text(
+                    isNepali ? 'नेपाली / English' : 'English / नेपाली',
+                  ),
+                  trailing: Switch(
+                    value: isNepali,
+                    onChanged: (value) {
+                      setState(() {
+                        isNepali = value;
+                      });
                     },
                   ),
-                );
-              },
-              icon: const Icon(Icons.edit),
-              label: Text(
-                isNepali ? 'प्रोफाइल सम्पादन गर्नुहोस्' : 'Edit Profile',
+                ),
               ),
-            ),
-          ),
 
-          const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.language),
-              title: Text(isNepali ? 'भाषा' : 'Language'),
-              subtitle: Text(
-                isNepali ? 'नेपाली / English' : 'English / नेपाली',
-              ),
-              trailing: Switch(
-                value: isNepali,
-                onChanged: (value) {
-                  setState(() {
-                    isNepali = value;
-                  });
-                },
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.report_problem_outlined),
-              title: Text(isNepali ? 'गुनासो' : 'Complaints'),
-              subtitle: Text(
-                isNepali
-                    ? 'समस्या वा गुनासो रिपोर्ट गर्नुहोस्'
-                    : 'Report an issue or problem',
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return const ComplaintsScreen();
-                    },
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.report_problem_outlined),
+                  title: Text(isNepali ? 'गुनासो' : 'Complaints'),
+                  subtitle: Text(
+                    isNepali
+                        ? 'समस्या वा गुनासो रिपोर्ट गर्नुहोस्'
+                        : 'Report an issue or problem',
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return const ComplaintsScreen();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -198,38 +239,15 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _nameController;
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _specializationController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _bioController = TextEditingController();
 
-  late TextEditingController _emailController;
-
-  late TextEditingController _phoneController;
-
-  late TextEditingController _specializationController;
-
-  late TextEditingController _experienceController;
-
-  late TextEditingController _addressController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    final therapist = ref.read(therapistProvider);
-
-    _nameController = TextEditingController(text: therapist.name);
-
-    _emailController = TextEditingController(text: therapist.email);
-
-    _phoneController = TextEditingController(text: therapist.phone);
-
-    _specializationController = TextEditingController(
-      text: therapist.specialization,
-    );
-
-    _experienceController = TextEditingController(text: therapist.experience);
-
-    _addressController = TextEditingController(text: therapist.address);
-  }
+  bool _controllersInitialized = false;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -238,54 +256,92 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _phoneController.dispose();
     _specializationController.dispose();
     _experienceController.dispose();
-    _addressController.dispose();
+    _bioController.dispose();
 
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final therapistAsync = ref.watch(therapistProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _textField(controller: _nameController, label: 'Name'),
-
-            _textField(
-              controller: _emailController,
-              label: 'Email',
-              keyboardType: TextInputType.emailAddress,
-            ),
-
-            _textField(
-              controller: _phoneController,
-              label: 'Phone',
-              keyboardType: TextInputType.phone,
-            ),
-
-            _textField(
-              controller: _specializationController,
-              label: 'Specialization',
-            ),
-
-            _textField(controller: _experienceController, label: 'Experience'),
-
-            _textField(controller: _addressController, label: 'Address'),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveProfile,
-                child: const Text('Save Changes'),
-              ),
-            ),
-          ],
+      body: therapistAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Unable to load profile.', textAlign: TextAlign.center),
+          ),
         ),
+        data: (therapist) {
+          if (!_controllersInitialized) {
+            _nameController.text = therapist.name;
+            _emailController.text = therapist.email;
+            _phoneController.text = therapist.phone;
+            _specializationController.text = therapist.specialization;
+            _experienceController.text = therapist.experience.toString();
+            _bioController.text = therapist.bio;
+
+            _controllersInitialized = true;
+          }
+
+          return Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _textField(controller: _nameController, label: 'Name'),
+
+                _textField(
+                  controller: _emailController,
+                  label: 'Email',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+
+                _textField(
+                  controller: _phoneController,
+                  label: 'Phone',
+                  keyboardType: TextInputType.phone,
+                ),
+
+                _textField(
+                  controller: _specializationController,
+                  label: 'Specialization',
+                ),
+
+                _textField(
+                  controller: _experienceController,
+                  label: 'Experience',
+                  keyboardType: TextInputType.number,
+                ),
+
+                _textField(
+                  controller: _bioController,
+                  label: 'Bio',
+                  maxLines: 4,
+                ),
+
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveProfile,
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Save Changes'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -294,12 +350,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     required TextEditingController controller,
     required String label,
     TextInputType? keyboardType,
+    int maxLines = 1,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
+        maxLines: maxLines,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -315,28 +373,72 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final currentTherapist = ref.read(therapistProvider);
+    final experience = int.tryParse(_experienceController.text.trim());
+
+    if (experience == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Experience must be a valid number.')),
+      );
+      return;
+    }
+
+    final therapistAsync = ref.read(therapistProvider);
+
+    final currentTherapist = therapistAsync.value;
+
+    if (currentTherapist == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load current profile.')),
+      );
+      return;
+    }
 
     final updatedTherapist = currentTherapist.copyWith(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       specialization: _specializationController.text.trim(),
-      experience: _experienceController.text.trim(),
-      address: _addressController.text.trim(),
+      experience: experience,
+      bio: _bioController.text.trim(),
     );
 
-    ref.read(therapistProvider.notifier).updateTherapist(updatedTherapist);
+    setState(() {
+      _isSaving = true;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated successfully')),
-    );
+    try {
+      await ref
+          .read(therapistProvider.notifier)
+          .updateTherapist(updatedTherapist);
 
-    Navigator.pop(context);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully')),
+      );
+
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update profile: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 }

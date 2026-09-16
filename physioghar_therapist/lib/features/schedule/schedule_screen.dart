@@ -1,81 +1,93 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_card.dart';
+import '../../models/schedule_model.dart';
+import '../../providers/schedule_create_provider.dart';
+import '../../providers/schedule_delete_provider.dart';
+import '../../providers/schedule_update_provider.dart';
+import '../../providers/schedules_provider.dart';
 
-class ScheduleScreen extends StatefulWidget {
+class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
-  State<ScheduleScreen> createState() {
+  ConsumerState<ScheduleScreen> createState() {
     return _ScheduleScreenState();
   }
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime selectedDate = DateTime.now();
-
-  final List<String> timeSlots = [
-    '09:00 AM',
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '01:00 PM',
-    '02:00 PM',
-    '03:00 PM',
-    '04:00 PM',
-  ];
-
-  final Map<String, String> slotStatuses = {
-    '09:00 AM': 'OPEN',
-    '10:00 AM': 'BOOKED',
-    '11:00 AM': 'OPEN',
-    '12:00 PM': 'BLOCKED',
-    '01:00 PM': 'OPEN',
-    '02:00 PM': 'BOOKED',
-    '03:00 PM': 'OPEN',
-    '04:00 PM': 'OPEN',
-  };
 
   @override
   Widget build(BuildContext context) {
+    final schedulesAsync = ref.watch(schedulesProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Schedule & Availability')),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddSlotDialog,
         child: const Icon(Icons.add),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select Date',
-              style: Theme.of(context).textTheme.headlineSmall,
+      body: schedulesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Unable to load schedule.\n\n$error',
+              textAlign: TextAlign.center,
             ),
-
-            const SizedBox(height: 12),
-
-            _buildDateSelector(),
-
-            const SizedBox(height: 24),
-
-            Text(
-              'Available Time Slots',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-
-            const SizedBox(height: 12),
-
-            ...timeSlots.map(
-              (time) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildSlotCard(time),
-              ),
-            ),
-          ],
+          ),
         ),
+        data: (schedules) {
+          final selectedSchedules = schedules
+              .where((schedule) => _isSameDate(schedule.date, selectedDate))
+              .toList();
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Date',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+
+                const SizedBox(height: 12),
+
+                _buildDateSelector(),
+
+                const SizedBox(height: 24),
+
+                Text(
+                  'Available Time Slots',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+
+                const SizedBox(height: 12),
+
+                if (selectedSchedules.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 30),
+                    child: Center(
+                      child: Text('No schedule slots for this date.'),
+                    ),
+                  )
+                else
+                  ...selectedSchedules.map(
+                    (schedule) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildSlotCard(schedule),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -120,7 +132,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+
                   const SizedBox(height: 6),
+
                   Text(
                     '${date.day}',
                     style: TextStyle(
@@ -138,8 +152,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildSlotCard(String time) {
-    final status = slotStatuses[time] ?? 'OPEN';
+  Widget _buildSlotCard(ScheduleModel schedule) {
+    final status = schedule.status;
 
     Color statusColor;
 
@@ -153,7 +167,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return AppCard(
       onTap: () {
-        _showSlotOptions(time);
+        _showSlotOptions(schedule);
       },
       child: Row(
         children: [
@@ -169,7 +183,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           const SizedBox(width: 14),
 
           Expanded(
-            child: Text(time, style: Theme.of(context).textTheme.titleMedium),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  schedule.time,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+
+                if (schedule.patientName != null &&
+                    schedule.patientName!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    schedule.patientName!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
           ),
 
           Container(
@@ -192,44 +223,87 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  void _showSlotOptions(String time) {
-    final status = slotStatuses[time];
-
-    if (status == 'BOOKED') {
+  void _showSlotOptions(ScheduleModel schedule) {
+    if (schedule.status == 'BOOKED') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This slot is already booked.')),
       );
+
       return;
     }
 
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(time, style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  schedule.time,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
 
                 const SizedBox(height: 20),
 
                 ListTile(
                   leading: Icon(
-                    status == 'BLOCKED' ? Icons.lock_open : Icons.block,
+                    schedule.status == 'BLOCKED'
+                        ? Icons.lock_open
+                        : Icons.block,
                   ),
                   title: Text(
-                    status == 'BLOCKED' ? 'Unblock Slot' : 'Block Slot',
+                    schedule.status == 'BLOCKED'
+                        ? 'Unblock Slot'
+                        : 'Block Slot',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+
+                    final newStatus = schedule.status == 'BLOCKED'
+                        ? 'OPEN'
+                        : 'BLOCKED';
+
+                    final updatedSchedule = schedule.copyWith(
+                      status: newStatus,
+                    );
+
+                    final result = await ref
+                        .read(scheduleUpdateProvider.notifier)
+                        .updateSchedule(updatedSchedule);
+
+                    if (!mounted) {
+                      return;
+                    }
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result != null
+                              ? newStatus == 'BLOCKED'
+                                    ? 'Slot blocked successfully'
+                                    : 'Slot unblocked successfully'
+                              : 'Failed to update schedule',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const Divider(),
+
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text(
+                    'Delete Slot',
+                    style: TextStyle(color: Colors.red),
                   ),
                   onTap: () {
-                    setState(() {
-                      slotStatuses[time] = status == 'BLOCKED'
-                          ? 'OPEN'
-                          : 'BLOCKED';
-                    });
+                    Navigator.pop(sheetContext);
 
-                    Navigator.pop(context);
+                    _confirmDeleteSchedule(schedule);
                   },
                 ),
               ],
@@ -240,65 +314,147 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  void _confirmDeleteSchedule(ScheduleModel schedule) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Schedule Slot?'),
+          content: Text(
+            'Are you sure you want to delete '
+            '${schedule.time} on ${schedule.date}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+
+                final success = await ref
+                    .read(scheduleDeleteProvider.notifier)
+                    .deleteSchedule(schedule.id);
+
+                if (!mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'Schedule slot deleted successfully'
+                          : 'Failed to delete schedule slot',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAddSlotDialog() {
-    final controller = TextEditingController();
+    final timeController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Add Schedule Slot'),
           content: TextField(
-            controller: controller,
+            controller: timeController,
             decoration: const InputDecoration(
               labelText: 'Time',
-              hintText: 'e.g. 05:00 PM',
+              hintText: 'e.g. 2:00 PM',
               border: OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                final time = controller.text.trim();
+              onPressed: () async {
+                final time = timeController.text.trim();
 
                 if (time.isEmpty) {
-                  return;
-                }
-
-                if (timeSlots.contains(time)) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('This time slot already exists.'),
-                    ),
+                    const SnackBar(content: Text('Please enter a time.')),
                   );
                   return;
                 }
 
-                setState(() {
-                  timeSlots.add(time);
-                  slotStatuses[time] = 'OPEN';
-                });
+                final formattedDate =
+                    '${selectedDate.year.toString().padLeft(4, '0')}-'
+                    '${selectedDate.month.toString().padLeft(2, '0')}-'
+                    '${selectedDate.day.toString().padLeft(2, '0')}';
 
-                Navigator.pop(context);
+                final newSchedule = ScheduleModel(
+                  id: 0,
+                  date: formattedDate,
+                  time: time,
+                  status: 'OPEN',
+                );
+
+                final result = await ref
+                    .read(scheduleCreateProvider.notifier)
+                    .createSchedule(newSchedule);
+
+                if (!dialogContext.mounted) {
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+
+                if (!mounted) {
+                  return;
+                }
 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Schedule slot added successfully.'),
+                  SnackBar(
+                    content: Text(
+                      result != null
+                          ? 'Schedule slot added successfully'
+                          : 'Failed to add schedule slot',
+                    ),
                   ),
                 );
               },
-              child: const Text('Add'),
+              child: const Text('Add Slot'),
             ),
           ],
         );
       },
-    );
+    ).then((_) {
+      timeController.dispose();
+    });
+  }
+
+  bool _isSameDate(String scheduleDate, DateTime date) {
+    final parsedDate = DateTime.tryParse(scheduleDate);
+
+    if (parsedDate == null) {
+      return false;
+    }
+
+    return parsedDate.year == date.year &&
+        parsedDate.month == date.month &&
+        parsedDate.day == date.day;
   }
 
   String _dayName(DateTime date) {
